@@ -22,7 +22,7 @@ def load_wikis():
 
     # simple wiki uses the same models and labels as english wikipedia
     wikis = [wiki for wiki in wikis if wiki != "simplewiki"]
-    return wikis
+    return list(set(wikis))
     
 def load_makefile():
     with open("../Makefile",'r') as makefile1:
