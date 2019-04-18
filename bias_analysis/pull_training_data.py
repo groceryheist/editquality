@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re
+import time
 import subprocess
 import os
 import shutil
@@ -109,10 +110,12 @@ def grouper(iterable, n, fillvalue=None):
 
 def get_editor_traits(labels, context, output):
     rev_ids = [json.loads(label)['rev_id'] for label in labels]
-    # special case for wikidata
+    # special case for wikidata, esbooks
 
     if context == "wikidatawiki":
         host= "https://wikidata.org".format(context.replace("wiki",""))
+    elif context == "esbooks":
+        host= "https://es.wikibooks.org".format(context.replace("wiki",""))
     else:
         host= "https://{0}.wikipedia.org".format(context.replace("wiki",""))
 
@@ -141,10 +144,19 @@ def get_editor_traits(labels, context, output):
                     row['user'] = None
                     row['userid'] = None
                 yield row
-            
+
+    def keep_trying(call, *args, **kwargs):
+        try:
+            result = call(*args, **kwargs)
+            return result
+        except Exception as e:
+            print(e)
+            time.sleep(1)
+            keep_trying(call, *args, **kwargs)
+
     with ThreadPoolExecutor(100) as executor:
         # get revision metadata
-        revision_batches = executor.map(lambda batch:session.get(action="query", prop='revisions', rvprop=['ids','user','userid'], revids=batch, ), batches)
+        revision_batches = executor.map(lambda batch:keep_trying(call=session.get, action="query", prop='revisions', rvprop=['ids','user','userid'], revids=batch), batches)
 
         badrevids = []
         rows = []
