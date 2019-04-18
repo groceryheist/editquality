@@ -62,9 +62,13 @@ def load_labels(label_file):
 def score_labels(labels,context,label_file):
     ores_host = "https://ores.wikimedia.org/"
     user_agent = "Ores bias analysis project by Nate TeBlunthuis (groceryheist)"
-    output_file = "../scored_labels/{0}".format(label_file)
+    if not os.path.exists("../datasets/scored_labels"):
+        os.makedirs("../datasets/scored_labels")
+    output_file = open("../datasets/scored_labels/{0}".format(os.path.split(label_file)[1]),'w')
+    output = open(args['--output'], "w")
     call_ores(ores_host, user_agent, context, model_names = ["damaging","goodfaith","reverted"],
-              parallel_requests=3,retries=2,input=labels,output=output_file,batch_size=50,verbose=True)
+              parallel_requests=3,retries=2,input=labels,output=output,batch_size=50,verbose=True)
+    output_file.close()
 
 if __name__ == "__main__":
     wikis = load_wikis()
