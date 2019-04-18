@@ -67,14 +67,31 @@ def download_labels(label_file):
 def load_labels(label_file):
     return open("../{0}".format(label_file))
 
-def score_labels(labels,context,label_file):
-    ores_host = "https://ores.wikimedia.org/"
-    user_agent = "Ores bias analysis project by Nate TeBlunthuis <groceryheist@uw.edu>"
+def score_labels(labels,context,label_file, overwrite = False):
     if not os.path.exists("../datasets/scored_labels"):
         os.makedirs("../datasets/scored_labels")
-    output_file = open("../datasets/scored_labels/{0}".format(os.path.split(label_file)[1]),'w')
-    call_ores(ores_host, user_agent, context, model_names = ["damaging","goodfaith"],
-              parallel_requests=4,retries=2,input=labels,output=output_file,batch_size=50,verbose=True)
+
+    output_filename = "../datasets/scored_labels/{0}".format(os.path.split(label_file)[1])
+
+    if os.path.exists(output_filename) and overwrite == False:
+        return
+
+    ores_host = "https://ores.wikimedia.org/"
+    user_agent = "Ores bias analysis project by Nate TeBlunthuis <groceryheist@uw.edu>"
+
+    output_file = open(output_filename,'w')
+
+    call_ores(ores_host,
+              user_agent,
+              context,
+              model_names = ["damaging","goodfaith"],
+              parallel_requests=4,
+              retries=2,
+              input=labels,
+              output=output_file,
+              batch_size=50,
+              verbose=True)
+
     output_file.close()
 
 # get the features
@@ -109,12 +126,13 @@ def grouper(iterable, n, fillvalue=None):
 
 
 def get_editor_traits(labels, context, output):
+    print(context)
     rev_ids = [json.loads(label)['rev_id'] for label in labels]
     # special case for wikidata, esbooks
 
     if context == "wikidatawiki":
         host= "https://wikidata.org".format(context.replace("wiki",""))
-    elif context == "esbooks":
+    elif context == "eswikibooks":
         host= "https://es.wikibooks.org".format(context.replace("wiki",""))
     else:
         host= "https://{0}.wikipedia.org".format(context.replace("wiki",""))
@@ -152,7 +170,7 @@ def get_editor_traits(labels, context, output):
         except Exception as e:
             print(e)
             time.sleep(1)
-            keep_trying(call, *args, **kwargs)
+            return keep_trying(call, *args, **kwargs)
 
     with ThreadPoolExecutor(100) as executor:
         # get revision metadata
@@ -177,9 +195,9 @@ if __name__ == "__main__":
     
     with open("editor_revisions.tsv",'w') as label_metadata_temp1:
         out_schema = ['wiki','ns','pageid','title','revid','parentid','user','userid']
-
+        print("collecting userids")
         label_metadata_temp1.write('\t'.join(out_schema))
-
+        
         for label_file, context in zip(label_files,wikis):
             labels = load_labels(label_file)
             get_editor_traits(labels,context,label_metadata_temp1)
