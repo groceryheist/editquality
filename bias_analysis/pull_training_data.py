@@ -71,7 +71,7 @@ if __name__ == "__main__":
     makefile = load_makefile()
     label_files = list(map(lambda x: grep_labelfile(x, makefile), wikis))
     list(map(download_labels,label_files))
-    list(map(score_labels(load_labels(label_file),wiki,label_file) for wiki,label_file in zip(wikis,label_files)))
+    [score_labels(load_labels(label_file),wiki,label_file) for wiki,label_file in zip(wikis,label_files)]
     
     
 # next step
