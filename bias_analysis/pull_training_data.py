@@ -14,6 +14,7 @@ from revscoring.dependencies import Dependent
 import editquality.feature_lists
 from concurrent.futures import ThreadPoolExecutor
 import itertools
+import impala
 
 def load_wikis():
     lines = open("rcfilters_enabled.csv",'r')
@@ -184,7 +185,7 @@ def get_editor_traits(labels, context, output):
             for row in table_results(batch, context):
                 out_row = '\t'.join([str(row[key]) for key in out_schema])
                 output.write(out_row + '\n')
-
+                yield out_row
 
 if __name__ == "__main__":
     wikis = load_wikis()
@@ -193,6 +194,14 @@ if __name__ == "__main__":
     list(map(download_labels,label_files))
     [score_labels(load_labels(label_file),wiki,label_file) for wiki,label_file in zip(wikis,label_files)]
     
+    from impala.dbapi import connect
+    conn = connect(host='an-coord1001.eqiad.wmnet', port=10000,auth_mechanism="PLAIN")
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS nathante.ores_label_editors(wiki string, ns string, pageid bigint, title string, revid bigint, parentid bigint, user string, userid bigint)")
+
+    cursor.execute("SET hive.exec.dynamic.partition.mode=nonstrict")
+    query = """ INSERT INTO nathante.ores_label_editors PARTITION (wiki) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) """
+    # writes a tsv
     with open("editor_revisions.tsv",'w') as label_metadata_temp1:
         out_schema = ['wiki','ns','pageid','title','revid','parentid','user','userid']
         print("collecting userids")
@@ -200,7 +209,8 @@ if __name__ == "__main__":
         
         for label_file, context in zip(label_files,wikis):
             labels = load_labels(label_file)
-            get_editor_traits(labels,context,label_metadata_temp1)
-    
-    
+            rows = get_editor_traits(labels,context,label_metadata_temp1)
+            cursor.executemany(query,rows)
+
+    conn.close()
 # next step
