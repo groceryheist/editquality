@@ -47,11 +47,13 @@ gb = gb.withColumn("days_since_first_edit",
 
 # count the number of prior edits before
 gb = gb.withColumn("is_newcomer",(f.col("N_edits") <= 5) | (f.col("days_since_first_edit") < 30))
-
+gb = gb.withColumnRenamed("wiki","lwiki")
 label_editors = label_editors.join(gb,
                                    on=[label_editors.user==gb.user,
-                                       label_editors.wiki==gb.wiki],
+                                       label_editors.wiki==gb.lwiki],
                                    how='left_outer')
+
+label_editors = label_editors.drop("lwiki")
 
 label_editors = label_editors.withColumn("is_newcomer_2",
                                          f.when(f.isnull(
