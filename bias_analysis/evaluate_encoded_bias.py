@@ -2,6 +2,7 @@ import pandas as pd
 import itertools
 from pull_training_data import load_labels, load_wikis, load_makefile, grep_labelfile
 import json
+import os
 
 wikis = load_wikis()
 makefile = load_makefile()
@@ -51,11 +52,12 @@ df_labels = pd.merge(df_labels,df_editors, left_on=["rev_id","wiki"], right_on=[
 # 
 df = df_labels.loc[:,["wiki","rev_id","is_anon","is_newcomer","pred_damaging","pred_goodfaith","prob_damaging","prob_goodfaith","true_damaging","true_goodfaith"]]
 
+missing_scores = df.loc[df.pred_damaging.isna(),:]
+
+df = df.loc[~df.pred_damaging.isna(),:]
 df['group'] = 'normal'
 df.loc[df.is_anon==True,'group'] = 'anon'
 df.loc[df.is_newcomer==True,'group'] = 'newcomer'
-
-df = df[df['pred_damaging'].isna()]
 
 df['true_dam'] = df['pred_damaging'] == df['true_damaging']
 df['false_pos_dam'] = (df['true_dam'] == False) & (df['pred_damaging'])
@@ -79,7 +81,7 @@ from plotnine import *
 theme_set(theme_bw())
 
 p = ggplot(rates.reset_index(),aes(x='wiki',y='dmg_miscalibration',group='group',color='group',fill='group'))
-p = p + geom_bar(stat='identity',position='dodge')
+p = p + geom_bar(stat='identity')
 p = p + ylab("P(damaging|model) - P(damaging)")
 p.save("damaging_miscalibration.png",width=12,height=8,unit='cm')
 
