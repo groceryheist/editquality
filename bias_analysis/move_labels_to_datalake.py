@@ -65,7 +65,11 @@ def get_editor_traits(labels, context, output):
                 output.write(out_row + '\n')
                 yield out_row
 
+<<<<<<< HEAD
 def move_labels_to_datalake(label_files, wikis):
+=======
+def run(label_files, wikis):
+>>>>>>> e0168a0bc74e27c66b9c28d0df8bd110ba58971b
     conn = connect(host='an-coord1001.eqiad.wmnet', port=10000,auth_mechanism="PLAIN")
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE IF NOT EXISTS nathante.ores_label_editors(wiki string, ns string, pageid bigint, title string, revid bigint, parentid bigint, user string, userid bigint)")

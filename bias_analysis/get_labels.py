@@ -67,7 +67,11 @@ def grouper(iterable, n, fillvalue=None):
 
 def download_labels(label_files):
     for label_file in label_files:
+<<<<<<< HEAD
         _download_labels(label_file)
+=======
+        download_labels(label_file)
+>>>>>>> e0168a0bc74e27c66b9c28d0df8bd110ba58971b
 
 if __name__ == "__main__":
     wikis = load_wikis()
