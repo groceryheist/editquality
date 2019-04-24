@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from my_spark_session import spark
 import pyspark.sql.functions as f
 
@@ -5,7 +6,6 @@ reader = spark.read
 
 # ok we can get the table
 label_editors = reader.table("nathante.ores_label_editors")
-
 
 # get the edit history
 mw_hist = reader.table("wmf.mediawiki_history")
