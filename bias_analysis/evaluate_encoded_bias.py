@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from plotnine import *
 import pandas as pd
 import itertools
@@ -105,7 +106,10 @@ df = df_labels.loc[:, ["wiki",
 missing_scores = df.loc[df.prob_damaging.isna(), :]
 df = df.loc[~df.prob_damaging.isna(), :]
 
-df, acc, wikis = gen_preds(df)
+df, acc, wikis = gen_preds(df,model='damaging')
+print(list(zip(wikis, acc)))
+
+df, acc, wikis = gen_preds(df,model='goodfaith')
 print(list(zip(wikis, acc)))
 
 df['group'] = 'normal'
@@ -171,13 +175,13 @@ p = p + geom_bar(stat='identity', position='dodge')
 p = p + ylab("E(P(goodfaith|model)) - P(goodfaith)")
 p.save("goodfaith_miscalibration_pred.png", width=12, height=8, unit='cm')
 
-p = ggplot(rates, aes(x='wiki', y='false_pos_gf',
+p = ggplot(rates, aes(x='wiki', y='true_pos_gf',
                       group='group', color='group', fill='group'))
 p = p + geom_bar(stat='identity', position='dodge')
 p = p + ylab("False positive rate (goodfaith)")
 p.save("goodfaith_fpr.png", width=12, height=8, unit='cm')
 
-p = ggplot(rates, aes(x='wiki', y='false_neg_gf',
+p = ggplot(rates, aes(x='wiki', y='true_neg_gf',
                       group='group', color='group', fill='group'))
 p = p + geom_bar(stat='identity', position='dodge')
 p = p + ylab("False negative rate (goodfaith)")
