@@ -77,7 +77,7 @@ df = df_labels.loc[:, ["wiki",
 missing_scores = df.loc[df.prob_damaging.isna(), :]
 df = df.loc[~df.prob_damaging.isna(), :]
 
-df['group'] = 'normal'
+df['group'] = 'other'
 df.loc[df.is_anon == True, 'group'] = 'anon'
 df.loc[df.is_newcomer == True, 'group'] = 'newcomer'
 
@@ -150,11 +150,11 @@ dmg_very_likely_threshholds = {'ar':None,'bs':(0.549,1), 'ca':(0.924,1), 'cs':(0
 
 dmg_levels.append(ORESConfidenceLevel("dmg_very_likely", dmg_very_likely_threshholds))
 
-gf_very_likely_threshholds = {'ar':(0.999,1), 'bs':(0.999,1), 'ca':(0.999,1), 'cs':(0.747,1), 'data':(0.969,1), 'en':(0.787,1),'es':None, 'esbooks':(1,1), 'et':(0.682,1), 'fi':None, 'fr':(0.777,1), 'he':None, 'hu':(0.957,1), 'it':(0.87,1), 'ko':(0.617,1), 'lv':(0.997,1), 'nl':(0.596,1), 'pl':(0.912,1), 'pt':(0.866,1), 'ro':(0.895,1), 'ru':(0.762,1), 'sq':(0.919,1), 'sr':(0,1), 'sv':(0.982,1), 'tr':(0.86,1)}
+gf_very_likely_threshholds = {'ar':(0.999,1), 'bs':(0.999,1), 'ca':(0.999,1), 'cs':(0.747,1), 'data':(0.969,1), 'en':(0.787,1),'es':None, 'esbooks':(1,1), 'et':(0.682,1), 'fi':None, 'fr':(0.777,1), 'he':None, 'hu':(0.957,1), 'it':(0.87,1), 'ko':(0.617,1), 'lv':(0.997,1), 'nl':(0.596,1), 'pl':(0.912,1), 'pt':(0.866,1), 'ro':(0.895,1), 'ru':(0.762,1), 'sq':(0.919,1), 'sr':None, 'sv':(0.982,1), 'tr':(0.86,1)}
 
 gf_levels.append(ORESConfidenceLevel("gf_very_likely", gf_very_likely_threshholds, inverse=False))
 
-gf_likely_threshholds = {'ar':(0,1),'bs':(0,0.999),'ca':(0,0.999), 'cs':(0,0.95),'data':None,'en':(0,0.933), 'es':None, 'esbooks':None, 'et':(0,0.898), 'fi':(0,1), 'fr':(0,0.962), 'he':None, 'hu':None, 'it':(0,0.865), 'ko':(0,0.606),'lv':(0,0.999), 'nl':(0,0.691), 'pt':(0,0.782), 'pl':None, 'ro':(0,0.793), 'ru':(0,0.769), 'sq':(0,0.942), 'sr':(0,1), 'sv':(0,0.89), 'tr':(0,0.84)}
+gf_likely_threshholds = {'ar':(0,1),'bs':(0,0.999),'ca':(0,0.999), 'cs':(0,0.95),'data':None,'en':(0,0.933), 'es':None, 'esbooks':None, 'et':(0,0.898), 'fi':(0,1), 'fr':(0,0.962), 'he':None, 'hu':None, 'it':(0,0.865), 'ko':(0,0.606),'lv':(0,0.999), 'nl':(0,0.691), 'pt':(0,0.782), 'pl':None, 'ro':(0,0.793), 'ru':(0,0.769), 'sq':(0,0.942), 'sr':None, 'sv':(0,0.89), 'tr':(0,0.84)}
 
 gf_levels.append(ORESConfidenceLevel("gf_likely", gf_likely_threshholds, inverse=True))
 
@@ -250,7 +250,7 @@ fn_rates_damaging.variable.cat.rename_categories(['Very likely good', 'May have 
 
 p = ggplot(fn_rates_damaging, aes(x='wiki', y='mean',ymin= 'lower', ymax = 'upper', group='group',color='group')) + geom_pointrange(position=position_dodge(width=0.5)) + facet_wrap(facets='variable', ncol=2, nrow=2, scales='free_y') 
 
-p = p + ylab("False negative rate (Damage not predicted, but actually damaging")
+p = p + ylab("False negative rate (Damage not predicted, but actually damaging)")
 p = p + ggtitle("Bias of damaging model against newcomers and anons")
 p = p + theme(legend_position='right')
 p = p + theme(legend_title=element_blank())
@@ -264,7 +264,7 @@ fp_rates_goodfaith.variable.cat.rename_categories(['Very likely good faith', 'Ma
 
 p = ggplot(fp_rates_goodfaith, aes(x='wiki', y='mean',ymin= 'lower', ymax = 'upper', group='group',color='group')) + geom_pointrange(position=position_dodge(width=0.5)) + facet_wrap(facets='variable', ncol=2, nrow=2, scales='free_y') 
 
-p = p + ylab("False positive rate (Goodfaith predicted, but actually badfaith")
+p = p + ylab("False positive rate (Goodfaith predicted, but actually badfaith)")
 p = p + ggtitle("Bias of goodfaith model against newcomers and anons")
 p = p + theme(legend_position='right')
 p = p + theme(legend_title=element_blank())
@@ -285,36 +285,20 @@ p = p + theme(legend_position='right')
 p = p + theme(legend_title=element_blank())
 p.save("Goodfaith_fnr.png",width=18, height=8,units='in')
 
-
-# for confidenceLevel in dmg_levels:
-#     confidenceLevel.make_plots(rates, "damaging")
-
-# for confidenceLevel in gf_levels:
-#     confidenceLevel.make_plots(rates, "goodfaith")
-
-
-# df['true_dmg'] = df['pred_damaging'] == df['true_damaging']
-# df['false_pos_dmg'] = (df['true_dmg'] == False) & (df['pred_damaging'])
-# df['false_neg_dmg'] = df['true_dmg'] & (df['pred_damaging'] == False)
-
-# df['true_gf'] = df['pred_goodfaith'] == df['true_goodfaith']
-# df['false_pos_gf'] = (df['true_gf'] == False) & df['pred_goodfaith']
-# df['false_neg_gf'] = (df['true_gf'] == True) & \
-#     (df['pred_goodfaith'] == False)
-
-# df['pred_damaging'] = df['pred_damaging'].astype("double")
-# df['pred_goodfaith'] = df['pred_goodfaith'].astype("double")
-
 p = ggplot(rates, aes(x='wiki', y='dmg_miscalibration_mean',ymax='dmg_miscalibration_upper',ymin='dmg_miscalibration_lower',
                       group='group', color='group', fill='group'))
 p = p + geom_pointrange(position = position_dodge(width=0.5))
 p = p + ylab("P_model(damaging) - P(damaging)")
+p = p + ggtitle("Calibration of ORES damaging model")
+p = p + theme(legend_title = element_blank())
 p.save("damaging_miscalibration.png", width=16, height=8, unit='cm')
 
 p = ggplot(rates, aes(x='wiki', y='gf_miscalibration_mean',ymax='gf_miscalibration_upper',ymin='gf_miscalibration_lower',
                       group='group', color='group', fill='group'))
 p = p + geom_pointrange(position = position_dodge(width=0.5))
 p = p + ylab("P_model(goodfaith) - P(goodfaith)")
+p = p + ggtitle("Calibration of ORES goodfaith model")
+p = p + theme(legend_title = element_blank())
 p.save("goodfaith_miscalibration.png", width=12, height=8, unit='cm')
 
 # p = ggplot(rates, aes(x='wiki', y='false_pos_dmg_mean', ymax='false_pos_dmg_upper',ymin='false_pos_dmg_lower',
@@ -340,3 +324,23 @@ p.save("goodfaith_miscalibration.png", width=12, height=8, unit='cm')
 # p = p + geom_pointrange()
 # p = p + ylab("False negative rate (goodfaith)")
 # p.save("goodfaith_fnr.png", width=12, height=8, unit='cm')
+
+
+# for confidenceLevel in dmg_levels:
+#     confidenceLevel.make_plots(rates, "damaging")
+
+# for confidenceLevel in gf_levels:
+#     confidenceLevel.make_plots(rates, "goodfaith")
+
+
+# df['true_dmg'] = df['pred_damaging'] == df['true_damaging']
+# df['false_pos_dmg'] = (df['true_dmg'] == False) & (df['pred_damaging'])
+# df['false_neg_dmg'] = df['true_dmg'] & (df['pred_damaging'] == False)
+
+# df['true_gf'] = df['pred_goodfaith'] == df['true_goodfaith']
+# df['false_pos_gf'] = (df['true_gf'] == False) & df['pred_goodfaith']
+# df['false_neg_gf'] = (df['true_gf'] == True) & \
+#     (df['pred_goodfaith'] == False)
+
+# df['pred_damaging'] = df['pred_damaging'].astype("double")
+# df['pred_goodfaith'] = df['pred_goodfaith'].astype("double")
