@@ -1,3 +1,5 @@
+import os
+from get_labels import load_labels
 from ores.utilities.score_revisions import run as call_ores
 
 def _score_labels(labels,context,label_file, overwrite = False):
@@ -29,4 +31,4 @@ def _score_labels(labels,context,label_file, overwrite = False):
 
 def score_labels(label_files, wikis):
     for wiki, label_file in zip(wikis,label_files):
-        score_labels(load_labels(label_file),wiki,label_file)
+        _score_labels(load_labels(label_file),wiki,label_file)

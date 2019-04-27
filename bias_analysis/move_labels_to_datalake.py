@@ -1,10 +1,20 @@
 from concurrent.futures import ThreadPoolExecutor
 import itertools
 import mwapi
-from pyhive import hive
+import pyarrow as pa
+import pandas as pd
+import pyarrow.parquet as pq
+from get_labels import load_labels
+import json 
 
-def get_editor_traits(labels, context, output):
-    print(context)
+def grouper(iterable, n, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    args = [iter(iterable)] * n
+    return itertools.zip_longest(*args, fillvalue=fillvalue)
+
+
+def get_editor_traits(labels, context, out_schema):
     rev_ids = [json.loads(label)['rev_id'] for label in labels]
     # special case for wikidata, esbooks
 
@@ -21,25 +31,23 @@ def get_editor_traits(labels, context, output):
     batches = grouper(rev_ids, 50)
 
     def table_results(batch, context):
-        row = {}
         resultset = batch['query']['pages']
         for _, page_id in enumerate(resultset):
+            row = {}
             result = resultset[page_id]
+            row['wiki'] = context
             row['ns'] = result['ns']
             row['title'] = result['title']
-            row['pageid'] = result['pageid']
-            row['wiki'] = context
+            row['pageid'] = int(result['pageid'])
             revisions = result['revisions']
             for rev in revisions:
-                row['revid'] = rev['revid']
-                row['parentid'] = rev['parentid']
+                row['revid'] = int(rev['revid'])
+                row['parentid'] = int(rev['parentid'])
+                # there are some deleted revisions where we don't get to know the user, let's just exclude them.
                 if 'user' in rev:
                     row['user'] = rev['user']
-                    row['userid'] = rev['userid']
-                else:
-                    row['user'] = None
-                    row['userid'] = None
-                yield row
+                    row['userid'] = int(rev['userid'])
+                    yield row
 
     def keep_trying(call, *args, **kwargs):
         try:
@@ -60,27 +68,43 @@ def get_editor_traits(labels, context, output):
             if 'badrevids' in batch['query']:
                 badrevids.append(batch['query']['badrevids'])
             for row in table_results(batch, context):
-                out_row = '\t'.join([str(row[key]) for key in out_schema])
-                output.write(out_row + '\n')
-                yield out_row
+                yield row
 
 def move_labels_to_datalake(label_files, wikis):
-    conn = hive.Connection(host='an-coord1001.eqiad.wmnet', port=10000)
-    cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS nathante.ores_label_editors(ns string, pageid bigint, title string, revid bigint, parentid bigint, user string, userid bigint) PARTITIONED BY (wiki string)")
 
-    cursor.execute("SET hive.exec.dynamic.partition.mode=nonstrict")
-    query = """ INSERT INTO nathante.ores_label_editors PARTITION (wiki) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) """
-    # writes a tsv
-    with open("editor_revisions.tsv",'w') as label_metadata_temp1:
-        out_schema = ['wiki','ns','pageid','title','revid','parentid','user','userid']
-        print("collecting userids")
-        label_metadata_temp1.write('\t'.join(out_schema))
+    fs = pa.hdfs.connect(host='an-coord1001.eqiad.wmnet', port=10000)
+    fs = fs.connect()
+    parquet_path = "/user/nathante/ores_bias/nathante.ores_label_editors"
+    if fs.exists(parquet_path):
+        fs.rm(parquet_path, recursive=True)
+
+    out_schema = ['wiki', 'ns','pageid','title','revid','parentid','user','userid']
+    print("collecting userids")
+
+    for label_file, context in zip(label_files,wikis):
+
+        labels = load_labels(label_file)
+
+        rows = get_editor_traits(labels,context, out_schema)
+        pddf = pd.DataFrame(rows)
         
-        for label_file, context in zip(label_files,wikis):
-            labels = load_labels(label_file)
-            rows = get_editor_traits(labels,context,label_metadata_temp1)
-            cursor.executemany(query,rows)
+        pddf.to_pickle("ores_label_editors.pickle")
+        out_table = pa.Table.from_pandas(pddf)
 
-    conn.close()
-# next step
+        pq.write_to_dataset(out_table, root_path=parquet_path, partition_cols=['wiki'], filesystem=fs, flavor='spark',preserve_index=False)
+
+        print ("pushed labels for {0}".format(context))
+
+
+##    conn.close()
+
+     # query = """INSERT INTO nathante.ores_label_editors PARTITION (wiki='{0}') """.format(context)
+     #        query = query + "VALUES (%s, %s, %s, %s, %s, %s, %s)"
+     #        cursor.executemany(query, list(tuple(r) for r in rows))
+    # conn = connect(host='an-coord1001.eqiad.wmnet', port=10000, auth_mechanism='PLAIN')
+    # cursor = conn.cursor()
+    # cursor.execute("DROP TABLE nathante.ores_label_editors")
+
+    # cursor.execute("CREATE EXTERNAL TABLE nathante.ores_label_editors(ns string, pageid bigint, title string, revid bigint, parentid bigint, user string, userid bigint) PARTITIONED BY (wiki string) STORED AS PARQUET LOCATION '/user/nathante/ores_bias/nathante.ores_label_editors' ")
+
+    # cursor.execute("SET hive.exec.dynamic.partition.mode=nonstrict")

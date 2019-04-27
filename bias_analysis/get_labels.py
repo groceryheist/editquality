@@ -59,12 +59,6 @@ def _download_labels(label_file):
 def load_labels(label_file):
     return open("../{0}".format(label_file))
 
-def grouper(iterable, n, fillvalue=None):
-    "Collect data into fixed-length chunks or blocks"
-    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
-    args = [iter(iterable)] * n
-    return itertools.zip_longest(*args, fillvalue=fillvalue)
-
 def download_labels(label_files):
     for label_file in label_files:
         _download_labels(label_file)
