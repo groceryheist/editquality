@@ -1,8 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import itertools
 import mwapi
-import impala
-from impala.dbapi import connect
+from pyhive import hive
 
 def get_editor_traits(labels, context, output):
     print(context)
@@ -66,9 +65,9 @@ def get_editor_traits(labels, context, output):
                 yield out_row
 
 def move_labels_to_datalake(label_files, wikis):
-    conn = connect(host='an-coord1001.eqiad.wmnet', port=10000,auth_mechanism="PLAIN")
+    conn = hive.Connection(host='an-coord1001.eqiad.wmnet', port=10000)
     cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS nathante.ores_label_editors(wiki string, ns string, pageid bigint, title string, revid bigint, parentid bigint, user string, userid bigint)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS nathante.ores_label_editors(ns string, pageid bigint, title string, revid bigint, parentid bigint, user string, userid bigint) PARTITIONED BY (wiki string)")
 
     cursor.execute("SET hive.exec.dynamic.partition.mode=nonstrict")
     query = """ INSERT INTO nathante.ores_label_editors PARTITION (wiki) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) """
