@@ -1,5 +1,8 @@
-#!/usr/bin/env python3
-from my_spark_session import spark
+# run through spark-submit
+from pyspark import SparkContext, SparkConf
+from pyspark.sql import SparkSession
+sc = SparkContext(conf=SparkConf())
+spark = SparkSession(sc)
 import pyspark.sql.functions as f
 
 reader = spark.read
