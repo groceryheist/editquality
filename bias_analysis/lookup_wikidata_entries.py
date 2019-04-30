@@ -1,49 +1,48 @@
-import pandas as pd
-import numpy as np
-from qwikidata.sparql import return_sparql_query_results
-from move_labels_to_datalake import grouper
-import re
+import pyspark.sql.functions as f
 
-df = pd.read_pickle("labeled_newcomers_anons_wikidata_ids.pickle")
-df.pp_value = df.pp_value.str.decode('utf-8')
-df = df.reset_index()
-endpoint = "https://query.wikidata.org/sparql"
+conf = conf.set("spark.sql.crossJoin.enabled",'true')
 
-# we want to get instance of, and sex or gender
-base_query = """ SELECT ?s1 ?s2Label
-            WHERE  {
-                      {?s1 wdt:P31 wd:Q5}
-                      {?s1 wdt:P21 ?s2}
-            FILTER(?s1 IN (%s))
-            SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-                   }
-"""
+reader = spark.read
+wikidata_parquet = "/user/joal/wmf/data/wmf/mediawiki/wikidata_parquet/20190204"
+mapping_parquet = "/user/joal/wmf/data/wmf/wikidata/item_page_link/20190204"
 
-entities = ["wd:{0}".format(e) for e in set(df.pp_value)]
+df = reader.parquet("/user/nathante/ores_bias/nathante.ores_label_editors")
 
-N = int(np.ceil(len(entities) / 300))
-batches = list(grouper(entities, 300))
+mapping = reader.parquet(mapping_parquet)
 
-found_entities = []
-genders = []
-entityre = re.compile("http://www.wikidata.org/entity/(.*)")
-i = 0 
-for batch in batches:
-    i = i + 1
-    print("batch {0} / {1}".format(i,N))
-    query = base_query % ','.join(batch)
+# lookup wikidata ids
+df2 = df.join(mapping, on=[df.pageid == mapping.page_id, df.ns == mapping.page_namespace, df.wiki == mapping.wiki_db])
 
-    response  = return_sparql_query_results(query)
+df2 = df2.select(["ns","pageid","revid","title","user","userid","wiki","item_id","title_namespace_localized"])
 
-    bindings = response['results']['bindings']
-    found_entities.extend(entityre.findall(b['s1']['value'])[0] for b in bindings)
-    genders.extend(b['s2Label']['value'] for b in bindings)
-    
+# now lookup wikidata fields
 
-df2 = pd.DataFrame({"entity": found_entities, "gender":genders})
-df = pd.merge(df, df2, left_on='pp_value', right_on='entity', how='left')
-df = df.drop("pp_sortkey",1)
-df.to_pickle("labeled_pages_genders.pickle")
-# unpack the jsons
+wikidata = reader.parquet(wikidata_parquet)
 
-# join back to the original tabl
+wikidata
+
+wikidata_entities = wikidata.join(df2, on=[df2.item_id == wikidata.id])
+
+wikidata_entities = wikidata_entities.cache()
+
+claims = wikidata_entities.select(["id","ns","wiki","pageid","revid",f.explode("claims").alias("claim")])
+
+snaks = claims.select(["id","ns","wiki","pageid","revid",f.col("claim").mainSnak.alias("mainSnak")])
+
+from pyspark.sql.types import *
+
+dataValue_schema = StructType([StructField("entity-type",StringType()), StructField("numeric-id",IntegerType()), StructField("id", StringType())])
+
+values = snaks.select(["id","ns","wiki","pageid","revid",f.col("mainSnak").property.alias("property"),f.col("mainSnak").dataType.alias("dataType"), f.from_json(f.col("mainSnak").dataValue.value,schema=dataValue_schema).alias("dataValue")]).filter(f.col("property").isin(["P31","P21"])) 
+
+values = values.select([f.col("id").alias("entityid"),"property",f.col("dataValue").id.alias("valueid"),"ns","wiki","pageid","revid"])
+
+values = values.join(wikidata,on=[values.valueid == wikidata.id])
+
+values = values.select(['entityid','property',f.col("id").alias('valueid'),f.col("labels")['en'].alias("valuelabel")],"wiki","ns","pageid","revid")
+
+values = values.filter( (f.col("valueid")=="Q5") | (f.col("property")=="P21"))
+
+pddf = values.toPandas()
+
+pddf.to_pickle("page_wikidata_properties.pickle")
