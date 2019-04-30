@@ -1,6 +1,17 @@
+#!/usr/bin/env python3
+
+import pyspark.sql.functions as f
+from pyspark import SparkContext, SparkConf
+from pyspark.sql import SparkSession
+
+conf = SparkConf()
+conf = conf.set("spark.sql.crossJoin.enabled",'true')
+sc = SparkContext(conf= conf)
+spark = SparkSession(sc)
 import pyspark.sql.functions as f
 
-conf = conf.set("spark.sql.crossJoin.enabled",'true')
+
+
 
 reader = spark.read
 wikidata_parquet = "/user/joal/wmf/data/wmf/mediawiki/wikidata_parquet/20190204"
@@ -46,4 +57,4 @@ values = values.filter( (f.col("valueid")=="Q5") | (f.col("property")=="P21"))
 pddf = values.toPandas()
 
 pddf.to_pickle("page_wikidata_properties.pickle")
->>>>>>> 4ccd789367c27d8d8238c565d36216a3f06c5247
+
