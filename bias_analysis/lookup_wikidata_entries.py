@@ -1,4 +1,3 @@
-## TODO: make sure that we're only looking at articles on earth
 #!/usr/bin/env python3
 import numpy as np
 import pandas as pd
