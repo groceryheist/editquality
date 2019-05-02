@@ -1,47 +1,74 @@
 import pyspark.sql.functions as f
+from pyspark.sql.functions import pandas_udf
+from pyspark.sql.functions import PandasUDFType
+import numpy as np
+import pandas as pd
+from pyspark.sql.types import *
 
-conf = conf.set("spark.sql.crossJoin.enabled",'true')
+from pyspark.sql import SparkSession
+
+# conf = spark.sparkContext._conf.set("spark.sql.crossJoin.enabled",True)
+# spark.sparkContext.stop()
+# spark = SparkSession.builder.config(conf=conf).getOrCreate()
 
 reader = spark.read
+ores_labels = "/user/nathante/ores_bias/nathante.ores_label_editors"
 wikidata_parquet = "/user/joal/wmf/data/wmf/mediawiki/wikidata_parquet/20190204"
 mapping_parquet = "/user/joal/wmf/data/wmf/wikidata/item_page_link/20190204"
 
-df = reader.parquet("/user/nathante/ores_bias/nathante.ores_label_editors")
+labels = reader.parquet(ores_labels)
 
 mapping = reader.parquet(mapping_parquet)
 
 # lookup wikidata ids
-df2 = df.join(mapping, on=[df.pageid == mapping.page_id, df.ns == mapping.page_namespace, df.wiki == mapping.wiki_db])
+page_items = labels.join(mapping, on=[labels.pageid == mapping.page_id, labels.ns == mapping.page_namespace, labels.wiki == mapping.wiki_db])
 
-df2 = df2.select(["ns","pageid","revid","title","user","userid","wiki","item_id","title_namespace_localized"])
+for col in ['page_namespace','page_title','wiki_db','page_id']:
+    page_items = page_items.drop(col)
+
+#items = page_items.select(["item_id"]).distinct()
 
 # now lookup wikidata fields
 
 wikidata = reader.parquet(wikidata_parquet)
 
-wikidata
-
-wikidata_entities = wikidata.join(df2, on=[df2.item_id == wikidata.id])
+wikidata_entities = wikidata.join(page_items, on=[page_items.item_id == wikidata.id])
 
 wikidata_entities = wikidata_entities.cache()
 
-claims = wikidata_entities.select(["id","ns","wiki","pageid","revid",f.explode("claims").alias("claim")])
+for col in ['typ','labels','descriptions','aliases','references','siteLinks','item_id']:
+    wikidata_entities = wikidata_entities.drop(col)
 
-snaks = claims.select(["id","ns","wiki","pageid","revid",f.col("claim").mainSnak.alias("mainSnak")])
+claims = wikidata_entities.withColumn("claim",f.explode("claims"))
+claims = claims.drop("claims")
 
-from pyspark.sql.types import *
+snaks = claims.withColumn("mainSnak",f.col("claim").mainSnak)
+snaks = snaks.drop("claim")
 
-dataValue_schema = StructType([StructField("entity-type",StringType()), StructField("numeric-id",IntegerType()), StructField("id", StringType())])
+entitytype_schema = StructType([StructField("entity-type",StringType()), StructField("numeric-id",IntegerType()), StructField("id", StringType())])
 
-values = snaks.select(["id","ns","wiki","pageid","revid",f.col("mainSnak").property.alias("property"),f.col("mainSnak").dataType.alias("dataType"), f.from_json(f.col("mainSnak").dataValue.value,schema=dataValue_schema).alias("dataValue")]).filter(f.col("property").isin(["P31","P21"])) 
+globe_coordinate_schema = StructType([StructField("latitude",DoubleType()), StructField("longitude", DoubleType()), StructField("altitude",DoubleType()), StructField("precision",DoubleType()),StructField("globe",StringType())])
 
-values = values.select([f.col("id").alias("entityid"),"property",f.col("dataValue").id.alias("valueid"),"ns","wiki","pageid","revid"])
+values = snaks.withColumn("entitytypeValue",f.from_json(f.col("mainSnak").dataValue.value,schema=entitytype_schema))
+values = values.withColumn("latlongvalue",f.from_json(f.col("mainSnak").dataValue.value,schema=globe_coordinate_schema))
+values = values.withColumn("property",f.col("mainSnak").property)
 
-values = values.join(wikidata,on=[values.valueid == wikidata.id])
+values.filter(f.col("property").isin({"P625"}))
 
-values = values.select(['entityid','property',f.col("id").alias('valueid'),f.col("labels")['en'].alias("valuelabel")],"wiki","ns","pageid","revid")
+values = values.filter(f.col("property").isin({"P31","P21","P625"}))
 
-values = values.filter( (f.col("valueid")=="Q5") | (f.col("property")=="P21"))
+values = values.withColumnRenamed("id","entityid")
+
+values = values.join(wikidata,on=[values.entitytypeValue.id == wikidata.id], how='left_outer')
+
+values = values.withColumn("valueid", f.col("id"))
+values = values.withColumn("valuelabel", f.col("labels")['en'].alias("valuelabel"))
+
+
+for col in ['typ','labels','descriptions','aliases','references','siteLinks','item_id',"claims","mainSnak",'dataValue']:
+    values = values.drop(col)
+
+values = values.filter( (f.col("valueid")=="Q5") | (f.col("property")=="P21") | (f.col("property") == "P625"))
 
 pddf = values.toPandas()
 
