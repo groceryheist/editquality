@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import pandas as pd
 import reverse_geocode
 import feather
@@ -17,6 +18,10 @@ pivoted = pivoted.drop(('latlongvalue','P31'),axis=1)
 pivoted.columns = pivoted.columns.get_level_values(1)
 
 pivoted = pivoted.rename(columns={"P21":"sexorgender","P31":"ishuman","P625":"latlonginfo"})
+
+pivoted.loc[ ~ pivoted.latlonginfo.isnull(), "is_earth"] = pivoted.loc[ ~ pivoted.latlonginfo.isnull(), :].latlonginfo.apply(lambda s: s[4] == "http://www.wikidata.org/entity/Q2")
+
+pivoted.loc[pivoted.is_earth != True, 'latlonginfo'] = None
 
 pivoted.loc[ ~ pivoted.latlonginfo.isnull(), "latitude"] = pivoted.loc[ ~ pivoted.latlonginfo.isnull(), :].latlonginfo.apply(lambda s: s[0])
 
@@ -44,6 +49,6 @@ canonical_countries = pd.read_feather("canonical_data.countries.feather")
 
 df = pd.merge(pivoted, canonical_countries, left_on="country_code", right_on='iso_code', how='left')
 
-df = df.drop(['iso_code','reverse_geocode'], axis=1)
+df = df.drop(['iso_code','reverse_geocode','latlonginfo'], axis=1)
 
 df.to_pickle("label_edits_gender_geo.pickle")
