@@ -58,13 +58,17 @@ df_editors = pd.read_pickle("labeled_newcomers_anons.pickle")
 df_editors2 = pd.read_pickle("label_edits_gender_geo.pickle")
 
 # at this point we have the data we need
-df_editors2 = df_editors2.loc[:,['revid','wiki','title_namespace_localized','sexorgender','ishuman','latitude','longitude','country_code','name','economic_region','maxmind_continent']]
+df_editors2 = df_editors2.loc[:,['entityid','revid','wiki','title_namespace_localized','sexorgender','ishuman','latitude','longitude','country_code','name','economic_region','maxmind_continent']]
 
 df_editors = pd.merge(df_editors, df_editors2, left_on=['revid','wiki'], right_on=['revid','wiki'], how='left',suffixes=('','_y'))
 
 df_editors['rev_id'] = df_editors['revid']
 df_editors = df_editors.drop('revid',axis=1)
 #df_editors = df_editors.set_index("rev_id")
+
+n_edits = df_editors.loc[df_editors.ns == 0,'rev_id'].count()
+n_wikidataentities = df_editors.entityid.isna().sum()
+print("found {0} Wikidata ids for {1} edits ({2}%)".format(n_edits, n_wikidataentities, n_wikidataentities/n_edits))
 
 df_labels = pd.merge(df_labels, df_editors,left_on=['rev_id','wiki'],
                      right_on=["rev_id", "wiki"],
@@ -297,7 +301,7 @@ def make_plots(rates, suffix1, suffix2):
     p = p + ylab("P_model(damaging) - P(damaging)")
     p = p + ggtitle("Calibration of ORES damaging model for {0}".format(suffix1))
     p = p + theme(legend_title = element_blank())
-    p.save("damaging_miscalibration_{0}.png".format(suffix2), width=16, height=8, unit='cm')
+    p.save("damaging_miscalibration_{0}.png".format(suffix2), width=12, height=8, unit='cm')
 
     p = ggplot(rates, aes(x='wiki', y='gf_miscalibration_mean',ymax='gf_miscalibration_upper',ymin='gf_miscalibration_lower',
                           group='group', color='group', fill='group'))
