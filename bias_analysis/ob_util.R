@@ -98,8 +98,8 @@ prepare.df <- function(df){
     df[, has.patrollers := patroller.N.reverts > 0]
     df <- df[,treated.with.ores := treated & has.ores]
 
-    ## only look at 52 weeks prior to the change
-    df <- df[weeks.from.cutoff > -52]
+    ## only look at 52 weeks before and after the change
+    df <- df[abs(weeks.from.cutoff) <= 52]
     return(df)
 }
 
