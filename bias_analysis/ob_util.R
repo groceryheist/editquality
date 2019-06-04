@@ -98,7 +98,7 @@ prepare.df <- function(df){
     df <- df[,treated.with.ores := treated & has.ores]
 
     ## only look at 52 weeks prior to the change
-    df <- df[weeks.from.cutoff > -52]s
+    df <- df[weeks.from.cutoff > -52]
     return(df)
 }
 
