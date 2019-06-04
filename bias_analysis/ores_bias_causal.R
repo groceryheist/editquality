@@ -32,21 +32,9 @@ treated.model.1 = glm(data =wiki.stats, treatment.formula , family=binomial(link
 ## huston we have a problem with perfect seperation so we want to use the firth-penalized liklihood instead
 
 # turns out that logistf leads to smaller weights than the bayesian approach
-library(logistf)
-treated.model.1.1 = logistf(data =wiki.stats, formula=treatment.formula)
-
-coeftest(treated.model.1.1)
-
-wiki.stats[,treated.probs.pred := treated.model.1.1$predict]
-wiki.stats[treated == T,ip.weight := 1/treated.probs.pred]
-wiki.stats[treated == F,ip.weight := 1/(1-treated.probs.pred)]
-
-wiki.stats[treated.probs.pred > 0.10 | treated,
-           .(mean(treated.probs.pred),.N),by=.(treated)]
-
-# add the IP-weights to the df
-
-df <- merge(df,wiki.stats,by=c("wiki.db"),how='left outer',suffixes=c('','.y'))
+res <- add_ip_weights(df,wikistats)
+df  <- res$df
+wikistats  <- res$wikistats
 
 # let's check if excluding the wikis with the fewest reverts changes things
 # df = df[N_reverts >= median(N_reverts)]

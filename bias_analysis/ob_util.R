@@ -1,3 +1,4 @@
+library("logistf")
 library("data.table")
 library("ggplot2")
 library("lubridate")
@@ -188,4 +189,19 @@ prepare.wikistats <- function(df){
 
 
     return(wiki.stats)
+}
+
+add_ip_weights <- function(df, wiki.stats, how='logistf'){
+    treated.model.1.1 = logistf(data =wiki.stats, formula=treatment.formula)
+
+    coeftest(treated.model.1.1)
+
+    wiki.stats[,treated.probs.pred := treated.model.1.1$predict]
+    wiki.stats[treated == T,ip.weight := 1/treated.probs.pred]
+    wiki.stats[treated == F,ip.weight := 1/(1-treated.probs.pred)]
+
+# add the IP-weights to the df
+
+    df <- merge(df,wiki.stats,by=c("wiki.db"),how='left outer',suffixes=c('','.y'))
+    return(list(df=df,wiki.stats=wiki.stats))
 }
