@@ -6,7 +6,7 @@ treatment.formula<- update(treatment.rhs,treatment.lhs)
 
 m1.rhs  <-  . ~  treated + week.factor + treated.with.ores 
 
-m1.rhs.stan  <-  . ~ treated + weeks.from.cutoff + treated*weeks.from.cutoff + treated.with.ores + (1 | wiki.db)
+m1.rhs.stan  <-  . ~ treated + week.factor + treated.with.ores + (1 | wiki.db)
 
 m1.lhs <- geom.mean.ttr ~ .
 m1.formula <- update(m1.lhs,m1.rhs)
