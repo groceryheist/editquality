@@ -40,7 +40,7 @@ prepare.df <- function(df){
 
     df[treated == F, cutoff := get.rand.cutoff(wiki.db),by=.(wiki.db)]
 
-    df[treated == F, weeks.from.cutoff := round((week - cutoff)/dweeks(1))]
+    df[treated == F, weeks.from.cutoff := round((cutoff - week)/dweeks(1))]
 
     ## there's a problem with n.pages.baseline
 
