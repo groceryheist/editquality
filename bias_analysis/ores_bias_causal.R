@@ -14,10 +14,13 @@ df <- load_ts_ds()
 df <- prepare.df(df)
 wiki.stats <- prepare.wikistats(df)
 
-## drop 3 wikis that don't have any ns4 edits
+## drop 3 wikis with no ns4 edits
 wiki.stats <- wiki.stats[ns4.edits != 0]
-df <- df[wiki.db %in% wiki.stats$wiki.db]
 
+# drop 1 wiki with no reverts
+wiki.stats <- wiki.stats[n.reverts != 0]
+
+df <- df[wiki.db %in% wiki.stats$wiki.db]
 # the dv for model1 is ttr
 ## scale everything
 ## view count and active editors are super correlated with reverts
@@ -32,9 +35,9 @@ treated.model.1 = glm(data =wiki.stats, treatment.formula , family=binomial(link
 ## huston we have a problem with perfect seperation so we want to use the firth-penalized liklihood instead
 
 # turns out that logistf leads to smaller weights than the bayesian approach
-res <- add_ip_weights(df,wikistats)
+res <- add_ip_weights(df,wiki.stats)
 df  <- res$df
-wikistats  <- res$wikistats
+wiki.stats  <- res$wiki.stats
 
 # let's check if excluding the wikis with the fewest reverts changes things
 # df = df[N_reverts >= median(N_reverts)]
@@ -113,21 +116,21 @@ df[user_week_revert_cv == 0,.(wiki_db,any(treated), mean(N_reverts)),by='wiki_db
 # we should be using a zero-inflated model here
 library(crch)
 df2 <- df[user.week.revert.cv != 0]
-mod3.did <- glm(df, formula=m3.formula,family=Gamma())
+mod3.did <- glm(df2, formula=m3.formula,family=gaussian(link='log'))
 
 vcov.did <- sandwich::vcovCL(mod3.did,df[user.week.revert.cv!=0]$wiki.db)
 
 coeftest(mod3.did,vcov.did)
 
 # IP weights
-mod3.ip <- glm(df2, formula=update(mod3.lhs,mod3.rhs), weights = df2$ip.weight, family=gaussian(link='log'))
+mod3.ip <- glm(df2, formula=m3.formula, weights = df2$ip.weight, family=gaussian(link='log'))
 
 vcov.did <- sandwich::vcovCL(mod3.ip,df[user.week.revert.cv!=0]$wiki.db)
 
 coeftest(mod3.ip,vcov.did)
 
 # doubly robust
-mod3.dr <- glm(df2, formula=update(mod3.lhs, paste(". ~ + ", paste0(treatment.rhs[3],"+"),paste0(mod3.rhs[3],"- user.revert.cv",collapse="+"))), weights = df2$ip.weight, family=gaussian(link='log'))
+mod3.dr <- glm(df2, formula=m3.formula.dr, weights = df2$ip.weight, family=gaussian(link='log'))
 
 vcov.dr <- sandwich::vcovCL(mod3.dr,df$wiki.db)
 
