@@ -1,4 +1,5 @@
 library("logistf")
+library("matrixStats")
 library("data.table")
 library("ggplot2")
 library("lubridate")
@@ -8,7 +9,7 @@ library("lme4")
 theme_set(theme_bw())
 
 load_ts_ds <- function(){
-
+    
     treated = fread("ores_bias_data/rcfilters_enabled.csv")
     treated <- treated[,.(cutoff=min(timestamp)),by='Wiki']
     treated[,cutoff := lubridate::mdy(treated$cutoff)]
@@ -16,7 +17,7 @@ load_ts_ds <- function(){
     treated[['Wiki']] <- NULL
     df <- fread("ores_bias_data/wiki_weeks.csv",sep=',')
     df <- merge(df,treated,by=c("wiki_db"),all=TRUE)
-    df <- df[,week:=lubridate::ymd(week)]
+    df <- df[,week:=lubridate::date(week)]
     df[,weeks_from_cutoff := round((week - cutoff)/dweeks(1))]
     df[,has_ores:=weeks_from_cutoff >=0]
     df[is.na(weeks_from_cutoff),has_ores := FALSE]
@@ -28,7 +29,8 @@ load_ts_ds <- function(){
 prepare.df <- function(df){
 
     ## gotta do a regex replace to fix some of the names
-    names(df)[42:71] <- sapply(names(df)[42:71], function(n) paste0("ns",n))
+    namespace_names = grepl("^[01234].*",names(df))
+    names(df)[namespace_names] <- sapply(names(df)[namespace_names], function(n) paste0("ns",n))
 
     df[,wiki.db := factor(wiki.db)]
     df[,week.factor := factor(week)]
@@ -45,30 +47,68 @@ prepare.df <- function(df){
     ## there's a problem with n.pages.baseline
 
     df[is.na(view.count),view.count := 0]
-    df[is.na(patroller.N.reverts),patroller.N.reverts := 0]
-    df[is.na(admin.N.reverts),admin.N.reverts := 0]
-    df[is.na(bot.N.reverts),bot.N.reverts := 0]
-    df[is.na(other.N.reverts),other.N.reverts := 0]
-    df[is.na(anonymous.n.reverted),anonymous.n.reverted := 0]
-    df[is.na(newcomer.n.reverted),newcomer.n.reverted := 0]
-    df[is.na(established.n.reverted),established.n.reverted := 0]
-    df[is.na(ns4.anon.N.edits),ns4.anon.N.edits := 0]
-    df[is.na(ns4.newcomer.N.edits),ns4.newcomer.N.edits := 0]
-    df[is.na(ns4.non.anon.newcomer.N.edits),ns4.non.anon.newcomer.N.edits := 0]
-    df[is.na(ns0.anon.N.edits),ns0.anon.N.edits := 0]
-    df[is.na(ns0.newcomer.N.edits),ns0.newcomer.N.edits := 0]
-    df[is.na(ns0.non.anon.newcomer.N.edits),ns0.non.anon.newcomer.N.edits := 0]
-    df[is.na(n.pages.baseline.ns.0),n.pages.baseline.ns.0 := 0]
-    df[is.na(n.pages.baseline.ns.4),n.pages.baseline.ns.4 := 0]
-    df[is.na(user.week.revert.cv),user.week.revert.cv := 0]
+
+    replace_regex <- function(re,df){
+        for(x in names(df)[grepl(re,names(df))]){
+            df[is.na(df[[x]]), (x) := 0]
+        }
+        return(df)
+    }
+
+    rowsum_regex <- function(re,df,newname){
+        df[,(newname):=rowSums(.SD),.SDcols = names(df)[grepl(re,names(df))]]
+        return(df)
+    }
+
+    reverts_regex  <-  ".*\\.?.*\\.N\\.reverts"
+    df <- replace_regex(reverts_regex, df)
+
+    df <- rowsum_regex("patroller\\..*\\.N.reverts", df, "patroller.N.reverts")
+    df <- rowsum_regex("admin\\..*\\.N.reverts", df, "admin.N.reverts")
+    df <- rowsum_regex("bot\\..*\\.N.reverts", df, "bot.N.reverts")    
+    df <- rowsum_regex("other\\..*\\.N.reverts", df, "other.N.reverts")    
+
+    reverteds_regex <- ".*\\.?.*\\.n.reverted"
+    df <- replace_regex(reverteds_regex, df)
+
+    df <- rowsum_regex("anonymous\\..*\\.n.reverted", df, "anonymous.n.reverted")
+    df <- rowsum_regex("newcomer\\..*\\.n.reverted", df, "newcomer.n.reverted")
+    df <- rowsum_regex("established\\..*\\.n.reverted", df, "established.n.reverted")
+
+    edits_regex  <- ".*\\.?.*\\.N.edits"
+    df <- replace_regex(edits_regex, df)
+    df <- rowsum_regex(".*\\.anon.N.edits",df,"anon.N.edits")
+    df <- rowsum_regex(".*\\.newcomer.N.edits",df,"newcomer.N.edits")
+    df <- rowsum_regex(".*\\.non.anon.N.edits",df,"non.anon.N.edits")
+
+    pages_regex <- "n.*\\.pages.*"
+    df <- replace_regex(pages_regex, df)
+
+    df <- df[is.na(user.week.revert.cv),user.week.revert.cv := 0]
+
+    ttr_regex <- ".*\\..*\\.geom.mean.ttr"
+    df <- replace_regex(ttr_regex, df)
+
+    df <- rowsum_regex(".*\\.undo.geom.mean.ttr", df, "undo.geom.mean.ttr")
+    df <- rowsum_regex(".*\\.rollback.geom.mean.ttr", df, "rollback.geom.mean.ttr")
+    df <- rowsum_regex(".*\\.huggle.geom.mean.ttr", df, "huggle.geom.mean.ttr")
+    df <- rowsum_regex(".*\\.other.tool.geom.mean.ttr", df, "other.tool.geom.mean.ttr")
+    df <- rowsum_regex("anonymous\\..*\\.geom.mean.ttr", df, "anonymous.geom.mean.ttr")
+    df <- rowsum_regex("newcomer\\..*\\.geom.mean.ttr", df, "newcomer.geom.mean.ttr")
+    df <- rowsum_regex("established\\..*\\.geom.mean.ttr", df, "established.geom.mean.ttr")
+    df <- rowsum_regex("admin\\..*\\.geom.mean.ttr", df, "admin.geom.mean.ttr")
+    df <- rowsum_regex("bot\\..*\\.geom.mean.ttr", df, "bot.geom.mean.ttr")
+    df <- rowsum_regex("patroller\\..*\\.geom.mean.ttr", df, "patroller.geom.mean.ttr")
+    df <- rowsum_regex("other\\..*\\.geom.mean.ttr", df, "other.geom.mean.ttr")
+
     df[is.na(admin.geom.mean.ttr),admin.geom.mean.ttr := 0]
     df[is.na(bot.geom.mean.ttr),bot.geom.mean.ttr := 0]
     df[is.na(patroller.geom.mean.ttr),patroller.geom.mean.ttr := 0]
     df[is.na(other.geom.mean.ttr),other.geom.mean.ttr := 0]
 
-    df[is.na(established.mean.ttr),established.mean.ttr := 0]
-    df[is.na(newcomer.mean.ttr),newcomer.mean.ttr := 0]
-    df[is.na(anonymous.mean.ttr),anonymous.mean.ttr := 0]
+    df[is.na(established.geom.mean.ttr),established.geom.mean.ttr := 0]
+    df[is.na(newcomer.geom.mean.ttr),newcomer.geom.mean.ttr := 0]
+    df[is.na(anonymous.geom.mean.ttr),anonymous.geom.mean.ttr := 0]
 
     df[is.na(n.pages.created.ns.4),n.pages.created.ns.4 := 0]
 
@@ -121,11 +161,11 @@ prepare.wikistats <- function(df){
                          other.ttr = mean(other.geom.mean.ttr,na.rm=T), 
                          other.reverts = mean(other.N.reverts,na.rm=T),
                          newcomer.reverted = mean(newcomer.n.reverted,na.rm=T),
-                         newcomer.ttr = mean(newcomer.mean.ttr,na.rm=T),
+                         newcomer.ttr = mean(newcomer.geom.mean.ttr,na.rm=T),
                          anon.reverted = mean(anonymous.n.reverted,na.rm=T),
-                         anon.ttr = mean(anonymous.mean.ttr,na.rm=T), 
+                         anon.ttr = mean(anonymous.geom.mean.ttr,na.rm=T), 
                          established.reverted = mean(established.n.reverted,na.rm=T),
-                         established.ttr = mean(established.mean.ttr,na.rm=T),
+                         established.ttr = mean(established.geom.mean.ttr,na.rm=T),
                          n.reverteds = mean(n.reverteds, na.rm=T),
                          p.reverteds.newcomer = mean(p.reverteds.newcomer, na.rm=T),
                          p.reverteds.anonymous = mean(p.reverteds.anonymous, na.rm=T),
