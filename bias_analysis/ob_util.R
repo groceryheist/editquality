@@ -68,6 +68,12 @@ prepare.df <- function(df){
     df <- rowsum_regex("bot\\..*\\.N.reverts", df, "bot.N.reverts")    
     df <- rowsum_regex("other\\..*\\.N.reverts", df, "other.N.reverts")    
 
+
+    df <- rowsum_regex(".*\\.undo\\.N.reverts", df, "undo.N.reverts")
+    df <- rowsum_regex(".*\\.rollback\\.N.reverts", df, "rollback.N.reverts")
+    df <- rowsum_regex(".*\\.huggle\\.N.reverts", df, "huggle.N.reverts")    
+    df <- rowsum_regex(".*\\.otherTool\\.N.reverts", df, "otherTool.N.reverts")    
+
     reverteds_regex <- ".*\\.?.*\\.n.reverted"
     df <- replace_regex(reverteds_regex, df)
 
@@ -144,7 +150,7 @@ prepare.df <- function(df){
 }
 
 prepare.wikistats <- function(df){
-    wiki.stats  <-  df[(weeks.from.cutoff > -52) & (week < cutoff),
+    wiki.stats  <-  df[(weeks.from.cutoff > -52) & (week < cutoff) & (n.reverts > 0),
                        .(treated = any(treated,na.rm=T),
                          has.patrollers = any(has.patrollers, na.rm=T),
                          reverts.per.week = mean(n.reverts,na.rm=T),

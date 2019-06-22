@@ -8,14 +8,14 @@ m1.rhs  <-  . ~  treated + week.factor + treated.with.ores
 
 m1.rhs.stan  <-  . ~ treated + week.factor + treated.with.ores + (1 | wiki.db)
 
-m1.lhs <- geom.mean.ttr ~ .
+m1.lhs <- undo.geom.mean.ttr ~ .
 m1.formula <- update(m1.lhs,m1.rhs)
 m1.formula.stan  <- update(m1.lhs, m1.rhs.stan)
 m1.formula.dr <- update(m1.lhs, paste(". ~ + ", paste0(treatment.rhs[3],"+"),paste0(m1.rhs[3],"- ttr",collapse="+")))
 
 m1.formula.dr.stan <- update(m1.lhs, paste(". ~ + ", paste0(treatment.rhs[3],"+"),paste0(m1.rhs[3],"- ttr + (1|wiki.db)",collapse="+")))
 
-m2.lhs <- N.revert ~ .
+m2.lhs <- undo.N.reverts ~ .
 m2.rhs <- m1.rhs
 m2.rhs.stan <- m1.rhs.stan
 m2.formula  <- update(m2.lhs, m2.rhs)

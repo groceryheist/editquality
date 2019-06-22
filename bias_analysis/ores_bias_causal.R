@@ -20,6 +20,12 @@ wiki.stats <- wiki.stats[ns4.edits != 0]
 # drop 1 wiki with no reverts
 wiki.stats <- wiki.stats[n.reverts != 0]
 
+# drop several wikis with no anon reverts
+wiki.stats <- wiki.stats[n.reverteds.anonymous != 0]
+wiki.stats <- wiki.stats[n.reverteds.newcomer != 0]
+
+# drop several wikis with no anon edits to ns4
+
 df <- df[wiki.db %in% wiki.stats$wiki.db]
 # the dv for model1 is ttr
 ## scale everything
@@ -89,6 +95,7 @@ mod2_dr_pois <- glm(data=df,formula=m2.formula.dr, weights = df$ip_weight, famil
 
 mod2_dr <- glm.nb(data=df, formula=m2.formula.dr, weights = df$ip_weight, start=coef(mod2_dr_pois))
 saveRDS(object=mod2_dr,file = "ores_bias_data/mod2_dr.RDS")
+
 
 summary(mod2_did)
 
